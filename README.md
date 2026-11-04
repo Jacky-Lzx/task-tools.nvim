@@ -123,6 +123,11 @@ tasks.setup({
   watch_debounce = 150,
   env = {},            -- Added to the inherited process environment
   shell = nil,         -- nil: { vim.o.shell }; otherwise an argv list/string
+  terminal = {
+    position = 'float', -- 'float', 'bottom', 'top', 'left', 'right'
+    width = 0.9, height = 0.9, -- <= 1: fraction; > 1: cells
+    border = 'rounded', zindex = 50, winblend = 0,
+  },
   python = 'python3',   -- Or function(context) returning the selected interpreter
   providers = true,    -- Built-in providers
   tasks = {},          -- Definitions, or function(context) returning definitions
@@ -164,6 +169,23 @@ Mutating snapshots never changes the running job. `stop`/`send`/`remove` return
 `terminal()` toggles one shell per directory by default. An explicit `key` creates
 an independent slot. Command/environment options are used when creating the slot;
 while alive, toggling reuses the original process. A finished slot starts a new run.
+
+Terminals (including `TaskShell!` and terminal-mode tasks) open in a centered
+floating window by default. Floats resize with the editor, clamp to fit small
+screens and preserve the source split layout. `terminal.width` / `height` accept
+fractions up to 1 or integer cell counts above 1. Border choices are `none`,
+`single`, `double`, `rounded`, `solid`, `shadow`; `zindex` and `winblend` (0–100)
+apply to floats. `height` controls top/bottom splits; `width` controls left/right.
+The top-level `height` option still controls pipe output, task lists and quickfix.
+Override the layout for an opening without changing the process:
+
+```lua
+tasks.terminal({ window = { position = 'right', width = 60 } })
+tasks.show(id, { window = { position = 'float', width = 0.8, height = 0.7 } })
+```
+
+`run(..., { window = {...} })` also accepts these terminal layout overrides.
+Options apply when creating a window; hide and reopen to change an existing view.
 
 Add your own task discovery (e.g. interpreter selection or specialized builds):
 

@@ -16,12 +16,12 @@ import time
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def run():
+def run(position):
     with tempfile.TemporaryDirectory(prefix="task-tools-", dir="/private/tmp" if Path("/private/tmp").exists() else None) as directory:
         master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 32, 110, 0, 0))
         env = dict(os.environ, TERM="xterm-256color", TASK_TOOLS_TEST_DIR=directory,
-                   NVIM_LOG_FILE=directory + "/nvim.log")
+                   NVIM_LOG_FILE=directory + "/nvim.log", TASK_TOOLS_TERMINAL_POSITION=position)
         configured = env.get("TASK_TOOLS_CONFIGURED") == "1"
         if configured:
             env.update(NVIM_SMOKE_TEST="1", XDG_STATE_HOME=directory + "/state", XDG_CACHE_HOME=directory + "/cache")
@@ -33,6 +33,7 @@ def run():
             "list": b":TaskOpen\r", "output": b"\r", "jump": b"\r",
             "terminal_input": b"hello from PTY\r", "terminal_normal": b"\x1d", "hide": b"q",
             "reopen": b"\x1b[17~", "size_input": b"next\r", "finish": b"last\r",
+            "direct_hide": b"\x1b[17~", "direct_reopen": b"\x1b[17~",
             "save": b"Go// saved by TUI\x1b:w\r",
         }
         handled, output = set(), bytearray()
@@ -62,7 +63,7 @@ def run():
             file = Path(directory, "result")
             result = file.read_text() if file.exists() else "No result"
             assert process.returncode == 0 and result.startswith("PASS"), result + "\n" + output.decode(errors="replace")[-4000:]
-            print(result.splitlines()[0] + (" (configured)" if configured else " (clean)"))
+            print(result.splitlines()[0] + f" ({position}, " + ("configured)" if configured else "clean)"))
         finally:
             if process.poll() is None:
                 process.kill()
@@ -71,4 +72,5 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    for position in ("float", "bottom"):
+        run(position)

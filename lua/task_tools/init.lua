@@ -28,6 +28,12 @@ end
 
 function M.run(spec, opts)
   opts = opts or {}
+  if type(spec) == 'table' and spec.mode == 'terminal' and opts.window then
+    local valid, err = pcall(config.terminal, opts.window)
+    if not valid then
+      return report(nil, err)
+    end
+  end
   local watching = type(spec) == 'table' and spec.watch
   local id, err
   if watching then
@@ -40,7 +46,7 @@ function M.run(spec, opts)
     if focus == nil then
       focus = config.values.focus
     end
-    require('task_tools.ui').output(id, { focus = focus })
+    require('task_tools.ui').output(id, { focus = focus, window = opts.window })
   end
   return report(id, err)
 end
@@ -199,13 +205,13 @@ function M.terminal(opts)
       end
       return task.id
     end
-    M.show(task.id, { focus = true })
+    M.show(task.id, { focus = true, window = opts.window })
     return task.id
   end
   local command = opts.cmd or config.values.shell or { vim.o.shell }
   local id = M.run(
     { name = opts.name or 'Terminal', cmd = command, cwd = cwd, env = opts.env, mode = 'terminal' },
-    { open = true, focus = true }
+    { open = true, focus = true, window = opts.window }
   )
   if id then
     terminals[key] = id

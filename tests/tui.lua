@@ -43,7 +43,8 @@ local function active(id)
 end
 local function setup()
   local ok, err = xpcall(function()
-    api.setup({ open = false, watch_debounce = 30 })
+    local position = vim.env.TASK_TOOLS_TERMINAL_POSITION or 'float'
+    api.setup({ open = false, watch_debounce = 30, terminal = { position = position } })
     vim.o.hidden = true
     vim.o.laststatus = 2
     vim.fn.writefile({ 'int main(void) {', '  return missing_symbol;', '}' }, root .. '/source file.c')
@@ -88,7 +89,16 @@ local function setup()
             vim.keymap.set({ 'n', 't' }, '<F6>', function()
               api.terminal(terminal_options)
             end)
+            local layout = vim.fn.winlayout()
             local term = api.terminal(terminal_options)
+            local terminal_win = vim.fn.win_findbuf(api.get(term).buf)[1]
+            check(
+              (vim.api.nvim_win_get_config(terminal_win).relative == 'editor') == (position == 'float'),
+              'configured terminal layout'
+            )
+            if position == 'float' then
+              check(vim.deep_equal(layout, vim.fn.winlayout()), 'float preserves source splits')
+            end
             local job = api.get(term).job
             stage('terminal_ready', function()
               return screen():find('READY>') and vim.api.nvim_get_mode().mode == 't'
@@ -112,41 +122,57 @@ local function setup()
                         api.get(term).job == job and screen():find('ANSWER:hello from PTY'),
                         'toggle reuses PTY and scrollback'
                       )
-                      stage('resize', function()
-                        return vim.o.columns == 72
+                      stage('direct_hide', function()
+                        return #vim.fn.win_findbuf(api.get(term).buf) == 0
+                          and vim.api.nvim_get_mode().mode:sub(1, 1) == 'n'
                       end, function()
-                        local rows, cols = vim.api.nvim_win_get_height(0), vim.api.nvim_win_get_width(0)
-                        stage('size_input', function()
-                          return table.concat(api.output(term), '\n'):find(rows .. ' ' .. cols)
+                        check(active(term), 'terminal-mode toggle preserves process and returns to normal mode')
+                        stage('direct_reopen', function()
+                          return #vim.fn.win_findbuf(api.get(term).buf) > 0 and vim.api.nvim_get_mode().mode == 't'
                         end, function()
-                          check(true, 'PTY receives resize')
-                          stage('finish', function()
-                            return not active(term) and screen():find('DONE')
+                          stage('resize', function()
+                            return vim.o.columns == 72
                           end, function()
-                            check(api.get(term).status == 'success' and screen():find('DONE'), 'terminal final output')
-                            vim.cmd('stopinsert')
-                            vim.api.nvim_set_current_win(vim.fn.bufwinid(source))
-                            local watch = api.run({
-                              name = 'save watcher',
-                              cmd = { 'sh', '-c', 'printf watching; sleep 10' },
-                              cwd = root,
-                              watch = { '*.c' },
-                            })
-                            stage('save', function()
-                              return api.list()[1].id ~= watch
+                            local rows, cols = vim.api.nvim_win_get_height(0), vim.api.nvim_win_get_width(0)
+                            stage('size_input', function()
+                              return table.concat(api.output(term), '\n'):find(rows .. ' ' .. cols)
                             end, function()
-                              local rerun = api.list()[1].id
-                              check(api.get(watch).status == 'stopped' and active(rerun), 'real write restarts watcher')
-                              api.stop(rerun)
-                              stage('wait_stop', function()
-                                return not active(rerun)
+                              check(true, 'PTY receives resize')
+                              stage('finish', function()
+                                return not active(term) and screen():find('DONE')
                               end, function()
-                                check(not api.get(rerun).watch_id, 'manual stop removes watch')
-                                vim.fn.writefile(
-                                  { ('PASS TUI: %d checks'):format(checks), screen() },
-                                  root .. '/result'
+                                check(
+                                  api.get(term).status == 'success' and screen():find('DONE'),
+                                  'terminal final output'
                                 )
-                                vim.cmd('qa!')
+                                vim.cmd('stopinsert')
+                                vim.api.nvim_set_current_win(vim.fn.bufwinid(source))
+                                local watch = api.run({
+                                  name = 'save watcher',
+                                  cmd = { 'sh', '-c', 'printf watching; sleep 10' },
+                                  cwd = root,
+                                  watch = { '*.c' },
+                                })
+                                stage('save', function()
+                                  return api.list()[1].id ~= watch
+                                end, function()
+                                  local rerun = api.list()[1].id
+                                  check(
+                                    api.get(watch).status == 'stopped' and active(rerun),
+                                    'real write restarts watcher'
+                                  )
+                                  api.stop(rerun)
+                                  stage('wait_stop', function()
+                                    return not active(rerun)
+                                  end, function()
+                                    check(not api.get(rerun).watch_id, 'manual stop removes watch')
+                                    vim.fn.writefile(
+                                      { ('PASS TUI: %d checks'):format(checks), screen() },
+                                      root .. '/result'
+                                    )
+                                    vim.cmd('qa!')
+                                  end)
+                                end)
                               end)
                             end)
                           end)

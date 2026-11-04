@@ -35,6 +35,8 @@ CONFIGURATION                                               *task-tools-setup*
     open = true, focus = false, height = 12, history = 100,
     output = {max_lines = 10000, max_line_bytes = 16384, flush_ms = 40},
     watch_debounce = 150, env = {}, shell = nil, python = 'python3',
+    terminal = {position='float', width=0.9, height=0.9,
+                border='rounded', zindex=50, winblend=0},
     providers = true, tasks = {},
   })
 <
@@ -44,6 +46,19 @@ shell=nil uses {vim.o.shell} for interactive shells. python may be a function(ct
 returning the selected interpreter. tasks may be a list or function(ctx) returning
 definitions. env extends the process environment; per-task values override it.
 Each setup() resets options to defaults plus the supplied options.
+
+Terminals default to centered floats. terminal.position accepts float, bottom,
+top, left, right. width/height <= 1 are fractions; > 1 are integer cells. Floats
+resize with the editor and clamp to fit. Border choices: none, single, double,
+rounded, solid, shadow. zindex and winblend (0-100) apply to floats. Top/bottom
+splits use height; left/right splits use width. The top-level height still controls
+pipe output, task lists and quickfix. Per-opening overrides:
+>
+  t.terminal({window={position='right', width=60}})
+  t.show(id, {window={position='float', width=0.8, height=0.7}})
+  t.run(definition, {window={position='bottom', height=12}})
+<
+Overrides apply to terminal windows when opened; hide/reopen to change a view.
 
 TASK DEFINITIONS                                            *task-tools-definitions*
 >

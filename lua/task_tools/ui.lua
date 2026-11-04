@@ -29,7 +29,7 @@ end
 
 local function window(buf, opts)
   opts = opts or {}
-  if opts.win and vim.api.nvim_win_is_valid(opts.win) then
+  if not opts.terminal and opts.win and vim.api.nvim_win_is_valid(opts.win) then
     vim.api.nvim_win_set_buf(opts.win, buf)
     return opts.win
   end
@@ -45,9 +45,14 @@ local function window(buf, opts)
   if vim.bo.buftype == '' then
     origin = previous
   end
-  vim.cmd('botright ' .. math.max(1, math.floor(opts.height or config.values.height)) .. 'split')
-  local win = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_set_buf(win, buf)
+  local win
+  if opts.terminal then
+    win = require('task_tools.terminal_window').open(buf, opts, opts.title)
+  else
+    vim.cmd('botright ' .. math.max(1, math.floor(opts.height or config.values.height)) .. 'split')
+    win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(win, buf)
+  end
   vim.wo[win].number, vim.wo[win].relativenumber = false, false
   vim.wo[win].signcolumn, vim.wo[win].foldcolumn = 'no', '0'
   vim.wo[win].statuscolumn, vim.wo[win].winbar = '', ''
@@ -102,6 +107,12 @@ local function render_output(task)
   end
   for _, win in ipairs(vim.fn.win_findbuf(task.buf)) do
     vim.wo[win].statusline = statusline(task)
+    if task.mode == 'terminal' then
+      require('task_tools.terminal_window').title(
+        win,
+        (' Task #%d [%s] %s '):format(task.id, task.status, safe(task.name))
+      )
+    end
   end
 end
 
@@ -139,6 +150,12 @@ function M.output(id, opts)
   if not task then
     return false, 'no task selected'
   end
+  if task.mode == 'terminal' then
+    local valid, err = pcall(config.terminal, opts.window)
+    if not valid then
+      return false, tostring(err)
+    end
+  end
   if not task.buf or not vim.api.nvim_buf_is_valid(task.buf) then
     if task.mode == 'terminal' then
       return false, 'terminal buffer was deleted'
@@ -164,6 +181,7 @@ function M.output(id, opts)
   else
     vim.keymap.set('t', '<C-]>', '<C-\\><C-n>', { buffer = buf, desc = 'Terminal normal mode' })
   end
+  opts = vim.tbl_extend('force', {}, opts, { terminal = task.mode == 'terminal', title = safe(task.name) })
   local win = window(buf, opts)
   render_output(core.get(task.id))
   vim.wo[win].wrap = false
