@@ -1,0 +1,152 @@
+*task-tools.txt*       Unified tasks and terminals for Neovim 0.11+
+
+TASK TOOLS                                                  *task-tools*
+
+No dependencies. setup() is optional. Module: require('task_tools').
+No global mappings or UI overrides are installed.
+
+COMMANDS                                                    *task-tools-commands*
+
+:TaskRun[!] [name]       Select a task or run an exact name; ! focuses output.
+:TaskShell[!] [command]  Run a shell command, or prompt. ! uses a focused PTY.
+:TaskTerminal           Toggle an interactive shell for :pwd.
+:TaskOpen               Open the task list.
+:TaskClose              Close the task list window.
+:TaskToggle             Toggle the task list.
+:TaskOutput [id]        Show output, focused.
+:TaskStop [id]          Disable watch and stop the process.
+:TaskRerun [id]         Run the captured definition with a fresh ID.
+:TaskWatch [id]         Disable watch, or enable it for a completed task.
+:TaskQuickfix [id]      Create a quickfix snapshot from retained output.
+:TaskDelete [id]        Delete a completed run and its buffer.
+:TaskSave {file}        Atomically save task definitions as JSON.
+:TaskLoad {file}        Validate and register definitions; never autostarts.
+
+Omitted IDs mean the most recent run. In the list, actions use the selected row:
+<CR> output, r rerun, s stop, w watch, d delete, c quickfix, q/<Esc> close.
+Output buffers: q hide, gq quickfix, <CR> jump (pipe output).
+PTY: <C-]> or native <C-\><C-N> enters Terminal-Normal mode. Then q hides.
+Hiding keeps a process alive; wiping a terminal stops it and disables watch.
+Active runs must stop/finish before rerun, deletion or enabling watch.
+
+CONFIGURATION                                               *task-tools-setup*
+>
+  require('task_tools').setup({
+    open = true, focus = false, height = 12, history = 100,
+    output = {max_lines = 10000, max_line_bytes = 16384, flush_ms = 40},
+    watch_debounce = 150, env = {}, shell = nil, python = 'python3',
+    providers = true, tasks = {},
+  })
+<
+open/focus control launch output. history prunes completed runs on new launches;
+active runs and watchers are retained. Output and unterminated lines are bounded.
+shell=nil uses {vim.o.shell} for interactive shells. python may be a function(ctx)
+returning the selected interpreter. tasks may be a list or function(ctx) returning
+definitions. env extends the process environment; per-task values override it.
+Each setup() resets options to defaults plus the supplied options.
+
+TASK DEFINITIONS                                            *task-tools-definitions*
+>
+  { name = 'build', cmd = {'cargo', 'build'}, cwd = '/project',
+    mode = 'pipe', env = {RUST_BACKTRACE = '1'}, watch = {'*.rs'},
+    errorformat = '%f:%l:%c: %m', stdin = 'optional pipe input' }
+<
+cmd: shell string or literal argv list. Only cmd is required. name defaults to
+the command. cwd defaults to :pwd and is captured at launch. mode is pipe or
+terminal. Pipe stdin closes after sending optional input; terminal stdin remains
+interactive. Each launch gets a distinct, increasing ID. Statuses are running,
+stopping, success, failure, stopped. Launch failures use exit_code=-1.
+
+Watch responds to editor BufWritePost in the captured directory. true matches
+all saves; glob lists match relative paths or basenames. Saves debounce into a
+serialized stop/restart. External changes are not monitored. Native watch commands
+like typst watch generally do not need the watch option.
+
+DISCOVERY                                                   *task-tools-providers*
+
+Root: nearest ancestor with .task-tools.json, Cargo.toml, package.json, Makefile,
+makefile, CMakeLists.txt, pyproject.toml, or .git. Fallback: current file directory,
+or :pwd for non-file buffers. Files run from disk; no automatic writes occur.
+Built-ins: Cargo, Make, CMake/CTest, package scripts, current Python/C/C++/shell,
+LaTeX, Typst, Markdown, and Verilog compile.sh. Tools are installed separately.
+
+.task-tools.json is data only, not executable project Lua:
+>
+  {"version":1,"tasks":[{"name":"test","cmd":["make","test"]}]}
+<
+Relative cwd resolves from the root. Discovery does not execute commands. Exact
+name priority: config > project > registered providers (sorted name) > built-ins.
+Provider/definition errors are returned without breaking other providers.
+>
+  local t = require('task_tools')
+  t.register_provider('mine', function(ctx)
+    -- ctx.buf, ctx.file, ctx.filetype, ctx.cwd
+    return {{name='test', cmd={'make','test'}, cwd=ctx.cwd}}
+  end)
+  local definitions, errors, ctx = t.discover({buf=0, cwd='/project'})
+<
+API                                                         *task-tools-api*
+>
+  local t = require('task_tools')
+  local id, err = t.run(definition, {open=true, focus=false})
+  t.shell('make && ./demo', {cwd='/project', mode='pipe'})
+  t.prompt({cwd='/project'})
+  t.select(name, opts) -- nil name opens vim.ui.select
+  t.stop(id); t.rerun(id, {open=false}); t.remove(id); t.toggle_watch(id)
+  t.show(id, {focus=true}); t.quickfix(id, {open=true, focus=false})
+  t.open(); t.close(); t.toggle()
+  t.terminal({key='shell', cwd='/project', cmd={'sh'}})
+  t.send(id, 'input\n') -- active PTYs only
+  local snapshot = t.get(id)
+  local newest_first = t.list()
+  local lines = t.output(id)
+  local counts = t.status()
+  local unsubscribe = t.subscribe(function(snapshot, kind) end)
+  unsubscribe()
+  t.save('/path/tasks.json'); t.load('/path/tasks.json')
+<
+run() returns id, err. Invalid definitions return nil, err; launch failures still
+return a task ID and a failure record. stop/send/remove return boolean, err.
+Mutating snapshots does not affect the job. Snapshot fields: id, name, cmd, cwd,
+mode, status, exit_code, started_at/finished_at (Unix seconds), job, buf, watch_id,
+dropped. status() counts running/stopping/success/failure/stopped/watch.
+terminal slots default to cwd; explicit keys create independent slots. A live
+slot reuses its original command/environment; a finished slot starts a new run.
+
+User TaskToolsChanged autocmd event.data contains {task=snapshot, kind=kind}.
+Kinds: start, output (throttled), stop, exit, watch, wipe, removed. Subscribers
+should observe state rather than launch nested jobs from launch callbacks.
+
+OUTPUT                                                      *task-tools-output*
+
+Pipe output is a bounded scratch buffer, cleaned of ANSI/OSC escapes. Enter jumps
+to a location. Scrolling away from the last line preserves the view; moving to
+the last line resumes follow. Quickfix is an explicit snapshot, never a global
+streaming sink. Export again to include new output. Embedded NUL renders as ^@.
+Default single-line formats include GCC/Clang, Rust arrows, Python tracebacks and
+MSVC. Relative locations use captured cwd. Custom errorformat uses single-line
+patterns; multiline diagnostics and recursive directory stacks are not combined.
+Shell cd inside a command does not change the parser's captured directory.
+PTY rendering/resize/scrollback are native Neovim. Its captured raw log can be
+exported to quickfix but does not reconstruct full-screen terminal programs.
+Jobs stop on Neovim exit. No detached processes are provided.
+
+SESSIONS                                                    *task-tools-sessions*
+
+save() / :TaskSave write version-1 JSON atomically. Newest unique definitions are
+retained, including active watcher options. Environment values, stdin, output,
+job IDs and process state are omitted. load() validates the complete file before
+replacing registered session choices; it starts no process or watcher. Environments
+are inherited/configured in the new editor. Session hooks are explicit. Exclude
+task UI and terminal buffers when saving editor sessions.
+
+No compile.nvim/Overseer/Snacks compatibility shims, dependency graphs, snippet
+interpreter semantics or debugger ownership are supplied.
+
+HEALTH                                                      *task-tools-health*
+
+:checkhealth task_tools
+
+See README.md for installation, mapping examples and test commands.
+
+ vim:tw=80:ts=8:noet:ft=help:norl:

@@ -23,7 +23,8 @@ function M.setup(opts)
   assert(type(c.history) == 'number' and c.history >= 1 and c.history % 1 == 0, 'invalid history')
   assert(type(c.height) == 'number' and c.height >= 1, 'invalid height')
   assert(type(c.watch_debounce) == 'number' and c.watch_debounce >= 1, 'invalid watch_debounce')
-  assert(type(c.env) == 'table' and type(c.tasks) == 'table', 'env and tasks must be tables')
+  assert(type(c.env) == 'table', 'env must be a table')
+  assert(type(c.tasks) == 'table' or type(c.tasks) == 'function', 'tasks must be a list or function')
   M.values = c
 end
 

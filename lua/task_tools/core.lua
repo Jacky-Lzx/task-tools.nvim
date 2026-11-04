@@ -49,6 +49,7 @@ local function emit(task, kind)
 end
 
 function M.subscribe(callback)
+  assert(type(callback) == 'function', 'subscriber must be a function')
   listeners[#listeners + 1] = callback
   return function()
     for i, item in ipairs(listeners) do
@@ -117,6 +118,15 @@ function M.normalize(spec)
     )
   end
   assert(spec.stdin == nil or type(spec.stdin) == 'string', 'stdin must be a string')
+  if spec.watch ~= nil and spec.watch ~= false and spec.watch ~= true then
+    assert(
+      type(spec.watch) == 'table' and vim.islist(spec.watch) and #spec.watch > 0,
+      'watch must be true or a nonempty glob list'
+    )
+    for _, pattern in ipairs(spec.watch) do
+      assert(type(pattern) == 'string', 'watch globs must be strings')
+    end
+  end
   if spec.errorformat then
     require('task_tools.parser').parse({ '' }, spec.cwd, spec.errorformat)
   end
@@ -195,7 +205,7 @@ function M.run(spec)
     on_exit = function(_, code)
       stream.finish(task.output)
       task.exit_code, task.finished_at = code, os.time()
-      task.status = task.status == 'stopping' and 'stopped' or (code == 0 and 'success' or 'failure')
+      task.status = task.stop_requested and 'stopped' or (code == 0 and 'success' or 'failure')
       emit(task, 'exit')
     end,
   }
@@ -207,7 +217,7 @@ function M.run(spec)
     vim.bo[task.buf].bufhidden = 'hide'
     vim.bo[task.buf].swapfile = false
     opts.term = true
-    vim.bo[task.buf].scrollback = config.values.output.max_lines
+    vim.bo[task.buf].scrollback = math.min(config.values.output.max_lines, 100000)
     launch = function()
       return vim.api.nvim_buf_call(task.buf, function()
         return vim.fn.jobstart(task.cmd, opts)
@@ -218,14 +228,23 @@ function M.run(spec)
   if not started or job <= 0 then
     task.status, task.finished_at = 'failure', os.time()
     task.exit_code = -1
-    stream.push(task.output, 'Cannot start command: ' .. tostring(job))
+    for _, line in ipairs(vim.split('Cannot start command: ' .. tostring(job), '\n', { plain = true })) do
+      stream.push(task.output, line)
+    end
+    if task.buf and vim.api.nvim_buf_is_valid(task.buf) then
+      vim.bo[task.buf].buftype = 'nofile'
+      vim.bo[task.buf].filetype = 'tasktoolsoutput'
+    end
     emit(task, 'exit')
     return task.id, 'cannot start command: ' .. tostring(job)
   end
   task.job = job
   if task.mode == 'pipe' then
     if spec.stdin then
-      vim.fn.chansend(job, spec.stdin)
+      local sent, input_error = pcall(vim.fn.chansend, job, spec.stdin)
+      if not sent then
+        stream.push(task.output, 'Cannot send stdin: ' .. tostring(input_error):gsub('\n', ' '))
+      end
     end
     pcall(vim.fn.chanclose, job, 'stdin')
   end
@@ -236,6 +255,7 @@ function M.run(spec)
       buffer = task.buf,
       once = true,
       callback = function()
+        emit(task, 'wipe')
         if M.active(task) then
           M.stop(task.id)
         end
@@ -258,8 +278,10 @@ function M.stop(id)
     return true
   end
   task.status = 'stopping'
+  task.stop_requested = true
   local ok, result = pcall(vim.fn.jobstop, task.job)
   if not ok or result ~= 1 then
+    task.status = 'running'
     return false, 'could not stop task'
   end
   emit(task, 'stop')
@@ -283,6 +305,7 @@ end
 function M.set_watch(id, watch_id)
   if tasks[id] then
     tasks[id].watch_id = watch_id
+    emit(tasks[id], 'watch')
   end
 end
 

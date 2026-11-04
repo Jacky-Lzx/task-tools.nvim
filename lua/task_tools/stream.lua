@@ -22,6 +22,8 @@ end
 function M.receive(s, channel, data)
   local fragment = s.fragments[channel] or ''
   for i, part in ipairs(data) do
+    -- job callbacks encode embedded NUL as NL inside a list element.
+    part = part:gsub('\n', '^@')
     local room = s.opts.max_line_bytes - #fragment
     if room > 0 then
       fragment = fragment .. part:sub(1, room)
