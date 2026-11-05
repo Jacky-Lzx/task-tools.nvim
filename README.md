@@ -246,3 +246,6 @@ Tests use real processes, a C compiler, and a real Neovim TUI/nested PTY with
 physical key input and rendered-cell assertions. Requires Python 3, `cc`, `sh`,
 `sleep`, `head`, `tr`, `stty`, and `printf`. `:checkhealth task_tools` checks the
 current environment and definitions.
+
+Python task definitions accept `python_env = function(context) return { VIRTUAL_ENV = ..., PATH = ... } end`
+(or a table) alongside the `python` interpreter provider. This changes only the task child process.

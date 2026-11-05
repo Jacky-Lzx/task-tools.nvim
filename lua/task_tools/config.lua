@@ -55,6 +55,10 @@ function M.setup(opts)
   assert(type(c.height) == 'number' and c.height >= 1, 'invalid height')
   assert(type(c.watch_debounce) == 'number' and c.watch_debounce >= 1, 'invalid watch_debounce')
   assert(type(c.env) == 'table', 'env must be a table')
+  assert(
+    c.python_env == nil or type(c.python_env) == 'table' or type(c.python_env) == 'function',
+    'python_env must be a table or context callback'
+  )
   assert(type(c.tasks) == 'table' or type(c.tasks) == 'function', 'tasks must be a list or function')
   validate_terminal(c.terminal)
   M.values = c

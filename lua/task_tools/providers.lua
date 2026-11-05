@@ -89,7 +89,9 @@ local function builtins(ctx)
   local cwd = vim.fs.dirname(ctx.file)
   if ctx.filetype == 'python' then
     local python = type(config.values.python) == 'function' and config.values.python(ctx) or config.values.python
-    add('Python: run file', { python, ctx.file }, { cwd = cwd, mode = 'terminal' })
+    local env = type(config.values.python_env) == 'function' and config.values.python_env(ctx)
+      or config.values.python_env
+    add('Python: run file', { python, ctx.file }, { cwd = cwd, mode = 'terminal', env = env })
   elseif ctx.filetype == 'c' or ctx.filetype == 'cpp' then
     local executable = ctx.file:gsub('%.[^/.]+$', '')
     if executable == ctx.file then

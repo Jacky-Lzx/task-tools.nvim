@@ -63,14 +63,23 @@ local ok, err = xpcall(function()
     tasks = function()
       return { { name = 'make', cmd = 'printf override' } }
     end,
-    python = function()
+    python = function(context)
+      assert(context.buf == vim.api.nvim_get_current_buf())
       return '/selected/python'
+    end,
+    python_env = function(context)
+      return { VIRTUAL_ENV = '/selected', PATH = '/selected/bin', SOURCE = context.file }
     end,
   })
   defs = api.discover()
   check(
     find(defs, 'make').cmd == 'printf override' and find(defs, 'Python: run file').cmd[1] == '/selected/python',
     'config and interpreter providers'
+  )
+  check(
+    find(defs, 'Python: run file').env.VIRTUAL_ENV == '/selected'
+      and find(defs, 'Python: run file').env.SOURCE == root .. '/src/main.py',
+    'project Python child environment'
   )
   api.register_provider('broken', function()
     error('provider exploded')
