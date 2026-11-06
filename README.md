@@ -269,3 +269,18 @@ observers and floating terminal windows, and resets setup options. Existing
 output buffers, completed history and caller subscriptions remain available.
 Disposal is repeatable; later explicit setup/run/watch/open rebuilds its needed
 observers. Buffer content is never force-deleted by disposal.
+
+## Optional task progress notifications
+
+After configuring task-tools, enable the adapter with
+`require('task_tools.integrations.notification_tools').setup()`.
+It uses an already-loaded notification-tools.nvim provider, with one progress
+handle per task. Result summaries are bounded, failures include the exit code and
+last output line, and the default history policy retains errors. It does not
+load notification-tools or create a second job/cancellation mechanism.
+
+Pass `filter = function(task) return ... end`, `history = true/false/'errors'`,
+or `provider = function() return notification_api end` to customize it.
+`open_last_output()` opens the last completed accepted task's original output;
+`dispose()` unsubscribes and closes progress without stopping tasks. Repeated
+setup replaces the subscription; task-tools disposal also detaches the adapter.

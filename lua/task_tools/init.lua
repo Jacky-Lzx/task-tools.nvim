@@ -24,7 +24,7 @@ function M.setup(opts)
 end
 -- Stop owned work without deleting output buffers or completed history.
 function M.dispose()
-  for _, name in ipairs({ 'watch', 'ui', 'terminal_window' }) do
+  for _, name in ipairs({ 'integrations.notification_tools', 'watch', 'ui', 'terminal_window' }) do
     local module = package.loaded['task_tools.' .. name]
     if module then
       module.dispose()
