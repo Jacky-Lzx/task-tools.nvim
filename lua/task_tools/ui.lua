@@ -291,6 +291,14 @@ function M.open(opts)
         require('task_tools').toggle_watch(id)
       end,
     }
+    local descriptions = {
+      ['<CR>'] = 'Show selected task output',
+      r = 'Rerun selected task',
+      s = 'Stop selected task',
+      d = 'Remove selected task',
+      c = 'Open selected task quickfix',
+      w = 'Toggle selected task file watch',
+    }
     for key, action in pairs(actions) do
       vim.keymap.set('n', key, function()
         local id = selected()
@@ -298,14 +306,14 @@ function M.open(opts)
           action(id)
           render_list()
         end
-      end, { buffer = list_buf, silent = true })
+      end, { buffer = list_buf, silent = true, desc = descriptions[key] })
     end
     vim.keymap.set('n', 'q', function()
       M.close()
-    end, { buffer = list_buf, silent = true })
+    end, { buffer = list_buf, silent = true, desc = 'Close task list' })
     vim.keymap.set('n', '<Esc>', function()
       M.close()
-    end, { buffer = list_buf, silent = true })
+    end, { buffer = list_buf, silent = true, desc = 'Close task list' })
   end
   list_win = window(list_buf, opts)
   vim.wo[list_win].statusline = ' Task Tools'
