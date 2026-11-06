@@ -26,7 +26,7 @@ local function ids()
   end, api().list())
 end
 local function create(name, callback, opts)
-  vim.api.nvim_create_user_command(name, callback, opts or {})
+  require('task_tools.user_command').create(name, callback, opts or {})
 end
 create('TaskRun', function(args)
   api().select(args.args, { open = true, focus = args.bang })

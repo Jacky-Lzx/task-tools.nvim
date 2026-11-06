@@ -249,3 +249,10 @@ current environment and definitions.
 
 Python task definitions accept `python_env = function(context) return { VIRTUAL_ENV = ..., PATH = ... } end`
 (or a table) alongside the `python` interpreter provider. This changes only the task child process.
+
+## Command ownership
+
+Commands belong to the plugin; choose global entry keys and short aliases in
+your configuration. Registration reports same-name conflicts without replacing
+user commands. Reconfiguration refreshes only commands still owned by this
+plugin, and cleanup preserves subsequent user replacements.
