@@ -11,8 +11,30 @@ local function report(value, err)
 end
 
 function M.setup(opts)
+  assert(opts == nil or type(opts) == 'table', 'task-tools.nvim: setup expects a table')
+  opts = vim.deepcopy(opts or {})
   config.setup(opts)
+  core.setup()
+  for _, name in ipairs({ 'watch', 'ui', 'terminal_window' }) do
+    local module = package.loaded['task_tools.' .. name]
+    if module then
+      module.setup()
+    end
+  end
 end
+-- Stop owned work without deleting output buffers or completed history.
+function M.dispose()
+  for _, name in ipairs({ 'watch', 'ui', 'terminal_window' }) do
+    local module = package.loaded['task_tools.' .. name]
+    if module then
+      module.dispose()
+    end
+  end
+  core.dispose()
+  terminals = {}
+  config.setup()
+end
+
 function M.get(id)
   return core.get(id)
 end

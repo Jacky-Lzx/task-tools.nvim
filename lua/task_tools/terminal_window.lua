@@ -1,5 +1,6 @@
 local M = {}
 local windows = {}
+local group
 
 local function dimension(value, available)
   return math.max(1, math.min(available, math.floor(value <= 1 and available * value or value)))
@@ -30,11 +31,11 @@ local function geometry(settings, title)
 end
 
 function M.open(buf, opts, title)
+  M.setup()
   local settings = require('task_tools.config').terminal(opts.window)
   local win
   if settings.position == 'float' then
     win = vim.api.nvim_open_win(buf, opts.focus ~= false, geometry(settings, title))
-    windows[win] = { settings = settings, title = title }
     vim.wo[win].winblend = settings.winblend
   else
     local vertical = settings.position == 'left' or settings.position == 'right'
@@ -47,6 +48,7 @@ function M.open(buf, opts, title)
     win = vim.api.nvim_get_current_win()
     vim.api.nvim_win_set_buf(win, buf)
   end
+  windows[win] = { settings = settings, title = title, buf = buf }
   return win
 end
 
@@ -61,24 +63,53 @@ function M.title(win, title)
   end
 end
 
-local group = vim.api.nvim_create_augroup('TaskToolsTerminalWindows', { clear = true })
-vim.api.nvim_create_autocmd('VimResized', {
-  group = group,
-  callback = function()
-    for win, entry in pairs(windows) do
-      if vim.api.nvim_win_is_valid(win) then
-        vim.api.nvim_win_set_config(win, geometry(entry.settings, entry.title))
-      else
-        windows[win] = nil
+function M.setup()
+  if group then
+    return
+  end
+  group = vim.api.nvim_create_augroup('TaskToolsTerminalWindows', { clear = true })
+  vim.api.nvim_create_autocmd('VimResized', {
+    group = group,
+    callback = function()
+      for win, entry in pairs(windows) do
+        if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == entry.buf then
+          if entry.settings.position == 'float' then
+            vim.api.nvim_win_set_config(win, geometry(entry.settings, entry.title))
+          end
+          -- Update the child before the next terminal input can query its size.
+          local channel = vim.bo[entry.buf].channel
+          if channel > 0 then
+            pcall(vim.fn.jobresize, channel, vim.api.nvim_win_get_width(win), vim.api.nvim_win_get_height(win))
+          end
+        else
+          windows[win] = nil
+        end
       end
+    end,
+  })
+  vim.api.nvim_create_autocmd('WinClosed', {
+    group = group,
+    callback = function(event)
+      windows[tonumber(event.match)] = nil
+    end,
+  })
+end
+
+function M.dispose()
+  if group then
+    vim.api.nvim_del_augroup_by_id(group)
+    group = nil
+  end
+  for win, entry in pairs(windows) do
+    if
+      vim.api.nvim_win_is_valid(win)
+      and vim.api.nvim_win_get_buf(win) == entry.buf
+      and not vim.bo[entry.buf].modified
+    then
+      pcall(vim.api.nvim_win_close, win, false)
     end
-  end,
-})
-vim.api.nvim_create_autocmd('WinClosed', {
-  group = group,
-  callback = function(event)
-    windows[tonumber(event.match)] = nil
-  end,
-})
+  end
+  windows = {}
+end
 
 return M

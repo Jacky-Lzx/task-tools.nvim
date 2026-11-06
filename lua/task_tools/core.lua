@@ -78,7 +78,7 @@ local function changed(task)
   task.scheduled = true
   vim.defer_fn(function()
     task.scheduled = false
-    if tasks[task.id] == task then
+    if tasks[task.id] == task and not task.disposed then
       emit(task, 'output')
     end
   end, config.values.output.flush_ms)
@@ -172,6 +172,7 @@ local function prune()
 end
 
 function M.run(spec)
+  M.setup()
   local ok, normalized = pcall(M.normalize, spec)
   if not ok then
     return nil, tostring(normalized)
@@ -195,14 +196,23 @@ function M.run(spec)
     cwd = task.cwd,
     env = next(spec.env) and spec.env or nil,
     on_stdout = function(_, data)
+      if task.disposed then
+        return
+      end
       stream.receive(task.output, 'stdout', data)
       changed(task)
     end,
     on_stderr = function(_, data)
+      if task.disposed then
+        return
+      end
       stream.receive(task.output, 'stderr', data)
       changed(task)
     end,
     on_exit = function(_, code)
+      if task.disposed then
+        return
+      end
       stream.finish(task.output)
       task.exit_code, task.finished_at = code, os.time()
       task.status = task.stop_requested and 'stopped' or (code == 0 and 'success' or 'failure')
@@ -309,16 +319,37 @@ function M.set_watch(id, watch_id)
   end
 end
 
-local group = vim.api.nvim_create_augroup('TaskToolsJobs', { clear = true })
-vim.api.nvim_create_autocmd('VimLeavePre', {
-  group = group,
-  callback = function()
-    for _, task in pairs(tasks) do
-      if M.active(task) then
-        pcall(vim.fn.jobstop, task.job)
+local group
+function M.setup()
+  if group then
+    return
+  end
+  group = vim.api.nvim_create_augroup('TaskToolsJobs', { clear = true })
+  vim.api.nvim_create_autocmd('VimLeavePre', {
+    group = group,
+    callback = function()
+      for _, task in pairs(tasks) do
+        if M.active(task) then
+          pcall(vim.fn.jobstop, task.job)
+        end
       end
+    end,
+  })
+end
+
+function M.dispose()
+  for _, task in ipairs(vim.tbl_values(tasks)) do
+    if M.active(task) then
+      M.stop(task.id)
+      task.status, task.finished_at = 'stopped', os.time()
     end
-  end,
-})
+    task.disposed, task.scheduled = true, false
+    stream.finish(task.output)
+  end
+  if group then
+    vim.api.nvim_del_augroup_by_id(group)
+    group = nil
+  end
+end
 
 return M

@@ -3,6 +3,7 @@ local core = require('task_tools.core')
 local parser = require('task_tools.parser')
 local config = require('task_tools.config')
 local list_buf, list_win, rows, origin
+local unsubscribe
 local ns = vim.api.nvim_create_namespace('TaskTools')
 local rendered = {}
 local colors = {
@@ -145,6 +146,7 @@ function M.jump(id)
 end
 
 function M.output(id, opts)
+  M.setup()
   opts = opts or {}
   local task = core.get(id)
   if not task then
@@ -264,6 +266,7 @@ local function render_list()
 end
 
 function M.open(opts)
+  M.setup()
   if not list_buf or not vim.api.nvim_buf_is_valid(list_buf) then
     list_buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(list_buf, 'task-tools://list')
@@ -310,7 +313,9 @@ function M.open(opts)
 end
 
 function M.close()
-  close(list_win)
+  if list_win and vim.api.nvim_win_is_valid(list_win) and vim.api.nvim_win_get_buf(list_win) == list_buf then
+    close(list_win)
+  end
   list_win = nil
 end
 
@@ -322,13 +327,27 @@ function M.toggle(opts)
   end
 end
 
-core.subscribe(function(task, kind)
-  if kind ~= 'output' then
-    render_list()
+function M.setup()
+  if unsubscribe then
+    return
   end
-  if task then
-    render_output(task)
+  unsubscribe = core.subscribe(function(task, kind)
+    if kind ~= 'output' then
+      render_list()
+    end
+    if task then
+      render_output(task)
+    end
+  end)
+end
+
+function M.dispose()
+  M.close()
+  if unsubscribe then
+    unsubscribe()
+    unsubscribe = nil
   end
-end)
+  rendered = {}
+end
 
 return M

@@ -1,6 +1,7 @@
 local M = {}
 local core = require('task_tools.core')
 local watchers, sequence = {}, 0
+local group, unsubscribe
 
 local function launch(w)
   if not w.enabled then
@@ -20,6 +21,7 @@ local function launch(w)
 end
 
 function M.start(spec)
+  M.setup()
   local ok, normalized = pcall(core.normalize, spec)
   if not ok then
     return nil, normalized
@@ -84,48 +86,67 @@ local function matches(w, file)
   return false
 end
 
-local group = vim.api.nvim_create_augroup('TaskToolsWatch', { clear = true })
-vim.api.nvim_create_autocmd('BufWritePost', {
-  group = group,
-  callback = function(event)
-    local file = vim.fs.normalize(vim.fn.fnamemodify(event.file, ':p'))
+function M.setup()
+  if group then
+    return
+  end
+  group = vim.api.nvim_create_augroup('TaskToolsWatch', { clear = true })
+  vim.api.nvim_create_autocmd('BufWritePost', {
+    group = group,
+    callback = function(event)
+      local file = vim.fs.normalize(vim.fn.fnamemodify(event.file, ':p'))
+      for _, w in pairs(watchers) do
+        if matches(w, file) then
+          w.ticket = w.ticket + 1
+          local ticket = w.ticket
+          vim.defer_fn(function()
+            if not w.enabled or ticket ~= w.ticket then
+              return
+            end
+            if core.active(core.get(w.task)) then
+              w.pending = true
+              core.stop(w.task)
+            else
+              launch(w)
+            end
+          end, require('task_tools.config').values.watch_debounce)
+        end
+      end
+    end,
+  })
+
+  unsubscribe = core.subscribe(function(task, kind)
+    if kind == 'wipe' then
+      if task.watch_id then
+        M.disable(task.watch_id)
+      end
+      return
+    end
+    if kind ~= 'exit' then
+      return
+    end
     for _, w in pairs(watchers) do
-      if matches(w, file) then
-        w.ticket = w.ticket + 1
-        local ticket = w.ticket
-        vim.defer_fn(function()
-          if not w.enabled or ticket ~= w.ticket then
-            return
-          end
-          if core.active(core.get(w.task)) then
-            w.pending = true
-            core.stop(w.task)
-          else
-            launch(w)
-          end
-        end, require('task_tools.config').values.watch_debounce)
+      if w.task == task.id and w.pending then
+        vim.schedule(function()
+          launch(w)
+        end)
       end
     end
-  end,
-})
+  end)
+end
 
-core.subscribe(function(task, kind)
-  if kind == 'wipe' then
-    if task.watch_id then
-      M.disable(task.watch_id)
-    end
-    return
+function M.dispose()
+  for _, id in ipairs(vim.tbl_keys(watchers)) do
+    M.disable(id)
   end
-  if kind ~= 'exit' then
-    return
+  if unsubscribe then
+    unsubscribe()
+    unsubscribe = nil
   end
-  for _, w in pairs(watchers) do
-    if w.task == task.id and w.pending then
-      vim.schedule(function()
-        launch(w)
-      end)
-    end
+  if group then
+    vim.api.nvim_del_augroup_by_id(group)
+    group = nil
   end
-end)
+end
 
 return M
