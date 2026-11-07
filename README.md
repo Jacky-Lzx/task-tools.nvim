@@ -245,7 +245,7 @@ TASK_TOOLS_CONFIGURED=1 python3 tests/tui.py
 Tests use real processes, a C compiler, and a real Neovim TUI/nested PTY with
 physical key input and rendered-cell assertions. Requires Python 3, `cc`, `sh`,
 `sleep`, `head`, `tr`, `stty`, and `printf`. `:checkhealth task_tools` checks the
-current environment and definitions.
+runtime shell. Use `:TaskInfo` for project definitions and current task state.
 
 Python task definitions accept `python_env = function(context) return { VIRTUAL_ENV = ..., PATH = ... } end`
 (or a table) alongside the `python` interpreter provider. This changes only the task child process.
@@ -284,3 +284,10 @@ or `provider = function() return notification_api end` to customize it.
 `open_last_output()` opens the last completed accepted task's original output;
 `dispose()` unsubscribes and closes progress without stopping tasks. Repeated
 setup replaces the subscription; task-tools disposal also detaches the adapter.
+
+## Health and inspection
+
+Health reports actionable failures and a compact result for applicable checks. Disabled,
+optional and not-yet-activated features do not warn solely because they are inactive.
+Inspection does not configure plugins, start services or install dependencies.
+Use `:TaskInfo` for detailed configuration and runtime information.

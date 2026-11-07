@@ -2,24 +2,36 @@ local M = {}
 
 function M.check()
   vim.health.start('task-tools.nvim')
-  if vim.fn.has('nvim-0.11') == 1 then
-    vim.health.ok('Neovim 0.11+ is available')
-  else
-    vim.health.error('Neovim 0.11+ is required')
+  if vim.fn.has('nvim-0.11') == 0 then
+    vim.health.error('Neovim 0.11+ is required', { 'Upgrade Neovim' })
+    return
   end
-  if vim.fn.executable(vim.o.shell) == 1 then
-    vim.health.ok('Shell: ' .. vim.o.shell)
-  else
-    vim.health.error('Shell is not executable: ' .. vim.o.shell)
+  local issues = {}
+  local function problem(level, message, advice)
+    issues[#issues + 1] = { level = level, message = message, advice = advice }
   end
-  vim.health.info('No plugin dependencies. Built-in task templates require their corresponding tools.')
-  local _, errors = require('task_tools.providers').discover()
-  for _, err in ipairs(errors) do
-    vim.health.warn(err)
+  if vim.fn.executable(vim.o.shell) == 0 then
+    problem(
+      'error',
+      'Shell is not executable: ' .. vim.o.shell .. '; tasks cannot start.',
+      { 'Set shell to a usable executable' }
+    )
   end
-  if #errors == 0 then
-    vim.health.ok('Task definitions are valid for this buffer')
+  -- Provider discovery may execute project callbacks; leave it to explicit TaskInfo.
+
+  table.sort(issues, function(a, b)
+    if a.level ~= b.level then
+      return a.level == 'error'
+    end
+    return a.message < b.message
+  end)
+  for _, issue in ipairs(issues) do
+    vim.health[issue.level](issue.message, issue.advice)
   end
+  if #issues == 0 then
+    vim.health.ok('Task execution runtime requirements are satisfied.')
+  end
+  vim.health.info('Details: :TaskInfo')
 end
 
 return M
