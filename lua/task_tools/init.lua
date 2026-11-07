@@ -24,7 +24,7 @@ function M.setup(opts)
 end
 -- Stop owned work without deleting output buffers or completed history.
 function M.dispose()
-  for _, name in ipairs({ 'integrations.notification_tools', 'watch', 'ui', 'terminal_window' }) do
+  for _, name in ipairs({ 'integrations.notification_tools', 'workflows', 'watch', 'ui', 'terminal_window' }) do
     local module = package.loaded['task_tools.' .. name]
     if module then
       module.dispose()
@@ -33,6 +33,20 @@ function M.dispose()
   core.dispose()
   terminals = {}
   config.setup()
+end
+
+-- These endpoints stay cold until an explicit action.
+M.manual = {}
+for _, method in ipairs({ 'prompt', 'rerun', 'stop', 'output', 'quickfix' }) do
+  M.manual[method] = function(...)
+    return require('task_tools.workflows')[method](...)
+  end
+end
+function M.argv(text)
+  return require('task_tools.workflows').argv(text)
+end
+function M.run_file()
+  return require('task_tools.workflows').run_file()
 end
 
 function M.get(id)

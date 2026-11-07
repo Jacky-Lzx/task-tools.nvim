@@ -166,3 +166,14 @@ or `provider = function() return notification_api end` to customize it.
 `open_last_output()` opens the last completed accepted task's original output;
 `dispose()` unsubscribes and closes progress without stopping tasks. Repeated
 setup replaces the subscription; task-tools disposal also detaches the adapter.
+
+## Manual builds and arguments
+
+`task_tools.manual.prompt({ default = "make" })` remembers a separate manual
+build. `manual.rerun()`, `stop()`, `output()` and `quickfix()` target that build,
+even after unrelated tasks or terminals run. Removing its history preserves the
+specification for rerun; disposal forgets it without restarting anything.
+`task_tools.run_file()` prompts for literal arguments for Python/C/C++ (and the
+executable for C/C++). Python executable/environment callbacks are read when the
+arguments are accepted. `task_tools.argv(text)` splits quotes and escapes without
+shell interpolation; malformed input returns `nil, error`.

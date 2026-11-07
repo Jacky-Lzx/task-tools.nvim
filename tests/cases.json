@@ -153,6 +153,25 @@
         "tests/tui.py"
       ],
       "timeout": 120
+    },
+    {
+      "name": "manual",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-l",
+        "tests/manual.lua"
+      ],
+      "files": [
+        "tests/manual.lua"
+      ],
+      "timeout": 90
     }
   ],
   "support": {
