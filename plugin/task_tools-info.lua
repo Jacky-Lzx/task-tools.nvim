@@ -10,6 +10,6 @@ require('task_tools.user_command').create('TaskInfo', function()
       },
     }),
     vim.log.levels.INFO,
-    { title = 'task-tools.nvim' }
+    { title = 'task-tools.nvim', filetype = 'lua' }
   )
 end, { desc = 'Inspect configuration and current runtime state' })
