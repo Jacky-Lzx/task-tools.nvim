@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "default": [
+    "unit",
+    "ui"
+  ],
+  "defaults": {},
+  "cases": [
+    {
+      "name": "runner-contracts",
+      "suite": "unit",
+      "command": [
+        "{python}",
+        "tests/runner_checks.py"
+      ],
+      "files": [
+        "tests/runner_checks.py"
+      ],
+      "timeout": 120
+    },
+    {
+      "name": "setup_contract",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-l",
+        "tests/setup_contract.lua"
+      ],
+      "files": [
+        "tests/setup_contract.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "command_ownership",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "--noplugin",
+        "-l",
+        "tests/command_ownership.lua"
+      ],
+      "files": [
+        "tests/command_ownership.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "core",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "-l",
+        "tests/core.lua"
+      ],
+      "files": [
+        "tests/core.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "workflows",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "-l",
+        "tests/workflows.lua"
+      ],
+      "files": [
+        "tests/workflows.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "notifications",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "-l",
+        "tests/notifications.lua"
+      ],
+      "files": [
+        "tests/notifications.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "terminal_windows",
+      "suite": "unit",
+      "command": [
+        "{nvim}",
+        "--headless",
+        "-u",
+        "NONE",
+        "-i",
+        "NONE",
+        "-l",
+        "tests/terminal_windows.lua"
+      ],
+      "files": [
+        "tests/terminal_windows.lua"
+      ],
+      "timeout": 90
+    },
+    {
+      "name": "tui",
+      "suite": "ui",
+      "command": [
+        "{python}",
+        "tests/tui.py"
+      ],
+      "files": [
+        "tests/tui.py"
+      ],
+      "timeout": 120
+    }
+  ],
+  "support": {
+    "tests/tui.lua": "Loaded by tests/tui.py",
+    "tests/run.sh": "Stable shell entry point for tests/run.py"
+  },
+  "manual": {}
+}
